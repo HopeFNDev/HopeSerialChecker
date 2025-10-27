@@ -9,10 +9,44 @@ public class TransparentTabControl : TabControl
         this.DoubleBuffered = true;
     }
 
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            var cp = base.CreateParams;
+            cp.ExStyle |= 0x20; // WS_EX_TRANSPARENT
+            return cp;
+        }
+    }
+
+    protected override void OnPaintBackground(PaintEventArgs e)
+    {
+        if (Parent != null)
+        {
+            var state = e.Graphics.Save();
+            try
+            {
+                var selfOnScreen = this.PointToScreen(Point.Empty);
+                var pOnScreen = Parent.PointToScreen(Point.Empty);
+                e.Graphics.TranslateTransform(pOnScreen.X - selfOnScreen.X, pOnScreen.Y - selfOnScreen.Y);
+                var pe = new PaintEventArgs(e.Graphics, Parent.DisplayRectangle);
+                Parent.InvokePaintBackground(Parent, pe);
+                Parent.InvokePaint(Parent, pe);
+            }
+            finally
+            {
+                e.Graphics.Restore(state);
+            }
+        }
+        else
+        {
+            base.OnPaintBackground(e);
+        }
+    }
+
     protected override void OnPaint(PaintEventArgs e)
     {
-        // Draw transparent background
-        e.Graphics.Clear(Color.Transparent);
+        
         
         // Draw tabs
         for (int i = 0; i < this.TabCount; i++)
@@ -26,20 +60,20 @@ public class TransparentTabControl : TabControl
         Rectangle tabRect = this.GetTabRect(index);
         bool selected = (this.SelectedIndex == index);
         
-        // Draw tab background
-        using (var brush = new SolidBrush(selected ? Color.FromArgb(180, 45, 45, 48) : Color.FromArgb(150, 30, 30, 30)))
+        
+        using (var brush = new SolidBrush(selected ? Color.Maroon : Color.Black))
         {
             g.FillRectangle(brush, tabRect);
         }
         
         // Draw tab border
-        using (var pen = new Pen(Color.FromArgb(100, 70, 130, 180), 1))
+        using (var pen = new Pen(Color.Maroon, 1))
         {
             g.DrawRectangle(pen, tabRect);
         }
         
         // Draw tab text
-        using (var brush = new SolidBrush(Color.White))
+        using (var brush = new SolidBrush(selected ? Color.White : Color.Maroon))
         {
             var sf = new StringFormat
             {

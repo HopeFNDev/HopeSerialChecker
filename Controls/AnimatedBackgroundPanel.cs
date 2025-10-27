@@ -104,7 +104,7 @@ public class AnimatedBackgroundPanel : Panel
         
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        g.Clear(Color.Black); // Pitch black background
+        g.Clear(Color.Black);
         
         // Draw particles with 3D perspective
         foreach (var particle in particles)
@@ -113,8 +113,7 @@ public class AnimatedBackgroundPanel : Panel
             float scale = 600f / (float)particle.Z;
             float size = 8 * scale;
             
-            // Draw particle - solid white
-            using (var brush = new SolidBrush(Color.White))
+            using (var brush = new SolidBrush(Color.Maroon))
             {
                 g.FillEllipse(brush, 
                     (float)particle.X - size / 2, 
@@ -136,7 +135,7 @@ public class AnimatedBackgroundPanel : Panel
                 if (distance < 150)
                 {
                     int alpha = (int)((1 - distance / 150) * 60);
-                    using (var pen = new Pen(Color.FromArgb(alpha, 255, 255, 255), 1))
+                    using (var pen = new Pen(Color.FromArgb(alpha, 128, 0, 0), 1))
                     {
                         g.DrawLine(pen, 
                             (float)particles[i].X, 

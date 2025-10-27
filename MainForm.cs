@@ -164,7 +164,7 @@ public partial class MainForm : Form
             Location = new Point(10, 10),
             Size = new Size(1160, 550),
             BackColor = Color.Transparent,
-            ForeColor = Color.White
+            ForeColor = Color.Maroon
         };
         backgroundPanel.Controls.Add(tabControl);
 
@@ -174,6 +174,7 @@ public partial class MainForm : Form
         CreateTab("Disks", "Disk");
         CreateTab("GPU", "GPU");
         CreateTab("Network", "NIC");
+        CreateTab("USB", "USB");
         CreateTab("ARP", "ARP");
 
         // Buttons - semi-transparent
@@ -182,11 +183,11 @@ public partial class MainForm : Form
             Text = "Refresh All",
             Location = new Point(10, 570),
             Size = new Size(100, 30),
-            BackColor = Color.FromArgb(200, 20, 20, 20),
+            BackColor = Color.Maroon,
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat
         };
-        btnRefresh.FlatAppearance.BorderColor = Color.White;
+        btnRefresh.FlatAppearance.BorderColor = Color.Maroon;
         btnRefresh.Click += BtnRefresh_Click;
         backgroundPanel.Controls.Add(btnRefresh);
 
@@ -195,11 +196,11 @@ public partial class MainForm : Form
             Text = "Copy Selected",
             Location = new Point(120, 570),
             Size = new Size(120, 30),
-            BackColor = Color.FromArgb(200, 20, 20, 20),
+            BackColor = Color.Maroon,
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat
         };
-        btnCopy.FlatAppearance.BorderColor = Color.White;
+        btnCopy.FlatAppearance.BorderColor = Color.Maroon;
         btnCopy.Click += BtnCopy_Click;
         backgroundPanel.Controls.Add(btnCopy);
 
@@ -208,11 +209,11 @@ public partial class MainForm : Form
             Text = "Export JSON",
             Location = new Point(250, 570),
             Size = new Size(120, 30),
-            BackColor = Color.FromArgb(200, 20, 20, 20),
+            BackColor = Color.Maroon,
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat
         };
-        btnExportJson.FlatAppearance.BorderColor = Color.White;
+        btnExportJson.FlatAppearance.BorderColor = Color.Maroon;
         btnExportJson.Click += BtnExportJson_Click;
         backgroundPanel.Controls.Add(btnExportJson);
 
@@ -221,11 +222,11 @@ public partial class MainForm : Form
             Text = "Export CSV",
             Location = new Point(380, 570),
             Size = new Size(120, 30),
-            BackColor = Color.FromArgb(200, 20, 20, 20),
+            BackColor = Color.Maroon,
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat
         };
-        btnExportCsv.FlatAppearance.BorderColor = Color.White;
+        btnExportCsv.FlatAppearance.BorderColor = Color.Maroon;
         btnExportCsv.Click += BtnExportCsv_Click;
         backgroundPanel.Controls.Add(btnExportCsv);
 
@@ -237,7 +238,7 @@ public partial class MainForm : Form
             Text = "Click 'Refresh All' to load hardware information.",
             AutoSize = false,
             BackColor = Color.Transparent,
-            ForeColor = Color.FromArgb(200, 220, 255)
+            ForeColor = Color.Maroon
         };
         backgroundPanel.Controls.Add(lblStatus);
 
@@ -260,10 +261,9 @@ public partial class MainForm : Form
 
     private void CreateTab(string tabName, string category)
     {
-        var tabPage = new TabPage(tabName);
-        tabPage.BackColor = Color.Transparent;
+        var tabPage = new TransparentTabPage(tabName);
         
-        var dgv = new DataGridView
+        var dgv = new TransparentDataGridView
         {
             Dock = DockStyle.None,
             Location = new Point(10, 10),
@@ -277,8 +277,8 @@ public partial class MainForm : Form
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
             MultiSelect = true,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-            BackgroundColor = Color.FromArgb(10, 10, 10), // Very dark, almost black
-            GridColor = Color.FromArgb(40, 40, 40),
+            BackgroundColor = Color.Black,
+            GridColor = Color.Maroon,
             ForeColor = Color.White,
             BorderStyle = BorderStyle.None,
             CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
@@ -290,21 +290,19 @@ public partial class MainForm : Form
         };
         
         // Style column headers - very dark, non-selectable
-        dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(20, 20, 20);
+        dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.Maroon;
         dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
-        dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(20, 20, 20);
+        dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.Maroon;
         dgv.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.White;
         dgv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
         
-        // Style rows - very dark
-        dgv.DefaultCellStyle.BackColor = Color.FromArgb(15, 15, 15);
+        dgv.DefaultCellStyle.BackColor = Color.Black;
         dgv.DefaultCellStyle.ForeColor = Color.White;
-        dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(50, 50, 50); // Dark gray selection
+        dgv.DefaultCellStyle.SelectionBackColor = Color.Maroon;
         dgv.DefaultCellStyle.SelectionForeColor = Color.White;
         
-        // Alternating row style - slightly lighter
-        dgv.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(25, 25, 25);
-        dgv.AlternatingRowsDefaultCellStyle.SelectionBackColor = Color.FromArgb(50, 50, 50); // Same dark gray selection
+        dgv.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(24, 0, 0);
+        dgv.AlternatingRowsDefaultCellStyle.SelectionBackColor = Color.Maroon;
         dgv.AlternatingRowsDefaultCellStyle.SelectionForeColor = Color.White;
         
         tabPage.Controls.Add(dgv);
@@ -406,7 +404,14 @@ public partial class MainForm : Form
             dataGridViews["NIC"].DataSource = null;
             dataGridViews["NIC"].DataSource = nicData;
             AdjustGridToContent(dataGridViews["NIC"]);
-            
+
+            // Load USB devices
+            var usbData = hardwareService.GetUsbDevices();
+            categoryData["USB"] = usbData;
+            dataGridViews["USB"].DataSource = null;
+            dataGridViews["USB"].DataSource = usbData;
+            AdjustGridToContent(dataGridViews["USB"]);
+
             // Load ARP table
             var arpData = hardwareService.GetArpTable();
             categoryData["ARP"] = arpData;

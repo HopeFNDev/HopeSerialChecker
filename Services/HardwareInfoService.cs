@@ -1168,6 +1168,64 @@ public class HardwareInfoService
 
     #endregion
 
+    #region USB Devices
+    public List<HardwareItem> GetUsbDevices()
+    {
+        var items = new List<HardwareItem>();
+        try
+        {
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            IntPtr h = SetupDiGetClassDevs(IntPtr.Zero, null, IntPtr.Zero, DIGCF_PRESENT | DIGCF_ALLCLASSES);
+            if (h == IntPtr.Zero || h == new IntPtr(-1))
+            {
+                items.Add(new HardwareItem { Category = "USB", Name = "Error", Value = "SetupDiGetClassDevs failed", Notes = "" });
+                return items;
+            }
+            try
+            {
+                uint index = 0;
+                while (true)
+                {
+                    var info = new SP_DEVINFO_DATA { cbSize = (uint)Marshal.SizeOf<SP_DEVINFO_DATA>() };
+                    if (!SetupDiEnumDeviceInfo(h, index, ref info)) break;
+                    index++;
+
+                    string? enumerator = GetDevRegPropString(h, ref info, SPDRP_ENUMERATOR_NAME);
+                    if (string.IsNullOrEmpty(enumerator)) continue;
+                    if (!string.Equals(enumerator, "USB", StringComparison.OrdinalIgnoreCase) &&
+                        !string.Equals(enumerator, "USBSTOR", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    string? name = GetDevRegPropString(h, ref info, SPDRP_FRIENDLYNAME);
+                    if (string.IsNullOrWhiteSpace(name))
+                        name = GetDevRegPropString(h, ref info, SPDRP_DEVICEDESC) ?? "USB Device";
+
+                    string instanceId = GetInstanceId(h, ref info) ?? string.Empty;
+                    if (string.IsNullOrEmpty(instanceId)) continue;
+                    if (!seen.Add(instanceId)) continue;
+
+                    bool isUsbStor = string.Equals(enumerator, "USBSTOR", StringComparison.OrdinalIgnoreCase);
+                    string serial = ExtractSerialFromInstance(instanceId, isUsbStor);
+
+                    items.Add(new HardwareItem { Category = "USB", Name = name, Value = string.IsNullOrEmpty(serial) ? "" : serial, Notes = "" });
+                }
+            }
+            finally
+            {
+                SetupDiDestroyDeviceInfoList(h);
+            }
+
+            if (items.Count == 0)
+                items.Add(new HardwareItem { Category = "USB", Name = "Info", Value = "No connected USB devices found", Notes = "" });
+        }
+        catch (Exception ex)
+        {
+            items.Add(new HardwareItem { Category = "USB", Name = "Error", Value = ex.Message, Notes = "Failed to retrieve" });
+        }
+        return items;
+    }
+    #endregion
+
     #region ARP Table
     public List<HardwareItem> GetArpTable()
     {
@@ -1383,6 +1441,94 @@ public class HardwareInfoService
         public uint TracksPerCylinder;
         public uint SectorsPerTrack;
         public uint BytesPerSector;
+    }
+
+    private const uint DIGCF_PRESENT = 0x00000002;
+    private const uint DIGCF_ALLCLASSES = 0x00000004;
+    private const uint SPDRP_DEVICEDESC = 0x00000000;
+    private const uint SPDRP_FRIENDLYNAME = 0x0000000C;
+    private const uint SPDRP_ENUMERATOR_NAME = 0x00000016;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct SP_DEVINFO_DATA
+    {
+        public uint cbSize;
+        public Guid ClassGuid;
+        public uint DevInst;
+        public IntPtr Reserved;
+    }
+
+    [DllImport("setupapi.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern IntPtr SetupDiGetClassDevs(IntPtr ClassGuid, string? Enumerator, IntPtr hwndParent, uint Flags);
+
+    [DllImport("setupapi.dll", SetLastError = true)]
+    private static extern bool SetupDiEnumDeviceInfo(IntPtr DeviceInfoSet, uint MemberIndex, ref SP_DEVINFO_DATA DeviceInfoData);
+
+    [DllImport("setupapi.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern bool SetupDiGetDeviceRegistryProperty(IntPtr DeviceInfoSet, ref SP_DEVINFO_DATA DeviceInfoData, uint Property, out uint PropertyRegDataType, byte[]? PropertyBuffer, uint PropertyBufferSize, out uint RequiredSize);
+
+    [DllImport("setupapi.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern bool SetupDiGetDeviceInstanceId(IntPtr DeviceInfoSet, ref SP_DEVINFO_DATA DeviceInfoData, StringBuilder DeviceInstanceId, int DeviceInstanceIdSize, out int RequiredSize);
+
+    [DllImport("setupapi.dll", SetLastError = true)]
+    private static extern bool SetupDiDestroyDeviceInfoList(IntPtr DeviceInfoSet);
+
+    private static string? GetDevRegPropString(IntPtr h, ref SP_DEVINFO_DATA info, uint prop)
+    {
+        uint type;
+        uint required;
+        SetupDiGetDeviceRegistryProperty(h, ref info, prop, out type, null, 0, out required);
+        if (required == 0) return null;
+        var buf = new byte[required];
+        if (!SetupDiGetDeviceRegistryProperty(h, ref info, prop, out type, buf, (uint)buf.Length, out required)) return null;
+        var s = Encoding.Unicode.GetString(buf, 0, (int)required);
+        int z = s.IndexOf('\0');
+        if (z >= 0) s = s.Substring(0, z);
+        s = s.Trim();
+        if (s.Length == 0) return null;
+        return s;
+    }
+
+    private static string? GetInstanceId(IntPtr h, ref SP_DEVINFO_DATA info)
+    {
+        int needed;
+        // First call to get required size
+        var sb = new StringBuilder(0);
+        if (!SetupDiGetDeviceInstanceId(h, ref info, sb, 0, out needed))
+        {
+            if (needed <= 1) return null;
+            sb = new StringBuilder(needed);
+            if (!SetupDiGetDeviceInstanceId(h, ref info, sb, sb.Capacity, out needed)) return null;
+        }
+        return sb.ToString();
+    }
+
+    private static string ExtractSerialFromInstance(string instanceId, bool isUsbStor)
+    {
+        if (string.IsNullOrEmpty(instanceId)) return string.Empty;
+        int idx = instanceId.LastIndexOf('\\');
+        string tail = idx >= 0 ? instanceId.Substring(idx + 1) : instanceId;
+
+        if (isUsbStor)
+        {
+            string serial = tail;
+            int amp = serial.IndexOf('&');
+            if (amp > 0) serial = serial.Substring(0, amp);
+            string trimmed = serial.Trim();
+            if (trimmed.Length == 0) return string.Empty;
+            bool allZeros = true;
+            for (int i = 0; i < trimmed.Length; i++)
+            {
+                if (trimmed[i] != '0') { allZeros = false; break; }
+            }
+            if (allZeros) return string.Empty;
+            return trimmed;
+        }
+        else
+        {
+            if (tail.IndexOf('&') >= 0) return string.Empty;
+            return tail.Trim();
+        }
     }
 
     #endregion
