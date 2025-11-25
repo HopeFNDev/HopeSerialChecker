@@ -1,6 +1,8 @@
-# Hardware Serial Checker
+# Hope's Serial Checker
 
 A Windows Forms application that retrieves hardware serial numbers and identifiers using **modern Windows APIs** (SMBIOS, Registry, DeviceIoControl, GetAdaptersInfo) **without WMI dependency**.
+
+Now featuring a stylish **Black and Blurple** theme!
 
 ## Features
 
@@ -30,6 +32,11 @@ The application uses a **tabbed interface** with separate tabs for each hardware
   - HardwareInformation.AdapterString, BiosString
   - MemorySize
 
+### Monitor Tab (New!)
+- **Registry-based EDID Parsing**:
+  - Retrieves Monitor Name and Serial Number directly from EDID data in the Registry (`HKLM\SYSTEM\CurrentControlSet\Enum\DISPLAY`)
+  - **No WMI dependency**
+
 ### Network Tab
 - **Kernel MAC addresses**: Retrieved via `GetAdaptersInfo` API (iphlpapi.dll)
 - **Registry MAC addresses**: Retrieved from `HKLM\SYSTEM\CurrentControlSet\Control\Class\{4D36E972-E325-11CE-BFC1-08002BE10318}`
@@ -39,7 +46,7 @@ The application uses a **tabbed interface** with separate tabs for each hardware
 
 **No WMI dependency** - uses modern, future-proof APIs:
 - **SMBIOS** (via `GetSystemFirmwareTable`) for BIOS/System/BaseBoard/Chassis info
-- **Windows Registry** for CPU, GPU, and NIC configuration
+- **Windows Registry** for CPU, GPU, Monitor, and NIC configuration
 - **DeviceIoControl** for direct disk hardware queries
 - **GetAdaptersInfo** (iphlpapi.dll) for network adapter enumeration
 - **P/Invoke** for low-level Windows API access
@@ -58,7 +65,7 @@ The application uses a **tabbed interface** with separate tabs for each hardware
 If you have .NET SDK installed:
 
 ```powershell
-cd C:\Users\Gringus\CascadeProjects\HardwareSerialChecker
+cd (your path)
 dotnet restore
 dotnet build
 ```
@@ -78,7 +85,7 @@ dotnet publish -c Release -r win-x64 --self-contained
 
 ## Usage
 
-1. **Tabs**: Switch between BIOS/System, CPU, Disks, GPU, and Network tabs
+1. **Tabs**: Switch between BIOS/System, CPU, Disks, GPU, Network, and Monitors tabs
 2. **Refresh All**: Click to reload all hardware information across all tabs
 3. **Copy Selected**: Select rows in the current tab and click to copy them to clipboard (tab-delimited)
 4. **Export JSON**: Export all data from all tabs to a JSON file

@@ -113,7 +113,7 @@ public class AnimatedBackgroundPanel : Panel
             float scale = 600f / (float)particle.Z;
             float size = 8 * scale;
             
-            using (var brush = new SolidBrush(Color.Maroon))
+            using (var brush = new SolidBrush(Color.FromArgb(88, 101, 242)))
             {
                 g.FillEllipse(brush, 
                     (float)particle.X - size / 2, 
@@ -135,7 +135,7 @@ public class AnimatedBackgroundPanel : Panel
                 if (distance < 150)
                 {
                     int alpha = (int)((1 - distance / 150) * 60);
-                    using (var pen = new Pen(Color.FromArgb(alpha, 128, 0, 0), 1))
+                    using (var pen = new Pen(Color.FromArgb(alpha, 88, 101, 242), 1))
                     {
                         g.DrawLine(pen, 
                             (float)particles[i].X, 

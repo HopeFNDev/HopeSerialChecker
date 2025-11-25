@@ -899,6 +899,119 @@ public class HardwareInfoService
 
     #endregion
 
+    #region Monitor
+
+    public List<HardwareItem> GetMonitorInfo()
+    {
+        var items = new List<HardwareItem>();
+        try
+        {
+            using var displayKey = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Enum\DISPLAY");
+            if (displayKey != null)
+            {
+                foreach (var monitorId in displayKey.GetSubKeyNames())
+                {
+                    using var monitorKey = displayKey.OpenSubKey(monitorId);
+                    if (monitorKey == null) continue;
+
+                    foreach (var instanceId in monitorKey.GetSubKeyNames())
+                    {
+                        using var instanceKey = monitorKey.OpenSubKey(instanceId);
+                        if (instanceKey == null) continue;
+
+                        using var paramsKey = instanceKey.OpenSubKey("Device Parameters");
+                        if (paramsKey == null) continue;
+
+                        var edid = paramsKey.GetValue("EDID") as byte[];
+                        if (edid != null && edid.Length >= 128)
+                        {
+                            string name = GetMonitorNameFromEdid(edid) ?? monitorId;
+                            string serial = GetMonitorSerialFromEdid(edid);
+
+                            if (!string.IsNullOrEmpty(serial))
+                            {
+                                items.Add(new HardwareItem
+                                {
+                                    Category = "Monitor",
+                                    Name = name,
+                                    Value = serial,
+                                    Notes = $"Instance: {instanceId}"
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            items.Add(new HardwareItem
+            {
+                Category = "Monitor",
+                Name = "Error",
+                Value = ex.Message,
+                Notes = "Failed to retrieve"
+            });
+        }
+
+        if (items.Count == 0)
+        {
+            items.Add(new HardwareItem
+            {
+                Category = "Monitor",
+                Name = "Info",
+                Value = "No monitors found with EDID serials",
+                Notes = ""
+            });
+        }
+
+        return items;
+    }
+
+    private string? GetMonitorNameFromEdid(byte[] edid)
+    {
+        // Descriptor blocks start at 54, 72, 90, 108
+        int[] offsets = { 54, 72, 90, 108 };
+        foreach (var offset in offsets)
+        {
+            if (edid[offset] == 0x00 && edid[offset + 1] == 0x00 && 
+                edid[offset + 2] == 0x00 && edid[offset + 3] == 0xFC) // Monitor Name
+            {
+                 return ExtractEdidString(edid, offset + 5);
+            }
+        }
+        return null;
+    }
+
+    private string GetMonitorSerialFromEdid(byte[] edid)
+    {
+        // Check for Serial Number Block (0xFF)
+        int[] offsets = { 54, 72, 90, 108 };
+        foreach (var offset in offsets)
+        {
+            if (edid[offset] == 0x00 && edid[offset + 1] == 0x00 && 
+                edid[offset + 2] == 0x00 && edid[offset + 3] == 0xFF) // Serial Number
+            {
+                 return ExtractEdidString(edid, offset + 5);
+            }
+        }
+        return string.Empty;
+    }
+
+    private string ExtractEdidString(byte[] edid, int start)
+    {
+        var sb = new StringBuilder();
+        for (int i = 0; i < 13; i++)
+        {
+            byte b = edid[start + i];
+            if (b == 0x0A) break; // Newline terminates
+            if (b >= 32 && b <= 126) sb.Append((char)b);
+        }
+        return sb.ToString().Trim();
+    }
+
+    #endregion
+
     #region Disk Direct Access
 
     private List<HardwareItem> GetDiskInfoDirect(string devicePath, int index)

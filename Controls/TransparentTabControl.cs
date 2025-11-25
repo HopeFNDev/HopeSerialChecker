@@ -4,89 +4,103 @@ public class TransparentTabControl : TabControl
 {
     public TransparentTabControl()
     {
-        this.SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | 
-                      ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true);
+        // Rely on the base TabControl for all painting/layout, but enable
+        // double-buffering and owner-draw headers so we can style them.
+        this.SetStyle(ControlStyles.AllPaintingInWmPaint |
+                      ControlStyles.OptimizedDoubleBuffer |
+                      ControlStyles.UserPaint |
+                      ControlStyles.ResizeRedraw,
+                      true);
         this.DoubleBuffered = true;
-    }
 
-    protected override CreateParams CreateParams
-    {
-        get
-        {
-            var cp = base.CreateParams;
-            cp.ExStyle |= 0x20; // WS_EX_TRANSPARENT
-            return cp;
-        }
+        this.DrawMode = TabDrawMode.OwnerDrawFixed;
     }
 
     protected override void OnPaintBackground(PaintEventArgs e)
     {
-        if (Parent != null)
+        // Use the standard background painting (no WS_EX_TRANSPARENT here).
+        base.OnPaintBackground(e);
+
+        using (var brush = new SolidBrush(Color.Black))
         {
-            var state = e.Graphics.Save();
-            try
-            {
-                var selfOnScreen = this.PointToScreen(Point.Empty);
-                var pOnScreen = Parent.PointToScreen(Point.Empty);
-                e.Graphics.TranslateTransform(pOnScreen.X - selfOnScreen.X, pOnScreen.Y - selfOnScreen.Y);
-                var pe = new PaintEventArgs(e.Graphics, Parent.DisplayRectangle);
-                Parent.InvokePaintBackground(Parent, pe);
-                Parent.InvokePaint(Parent, pe);
-            }
-            finally
-            {
-                e.Graphics.Restore(state);
-            }
-        }
-        else
-        {
-            base.OnPaintBackground(e);
+            e.Graphics.FillRectangle(brush, this.ClientRectangle);
         }
     }
 
     protected override void OnPaint(PaintEventArgs e)
     {
-        
-        
-        // Draw tabs
+        using (var backgroundBrush = new SolidBrush(Color.Black))
+        {
+            e.Graphics.FillRectangle(backgroundBrush, this.ClientRectangle);
+        }
+
+        Color blurple = Color.FromArgb(88, 101, 242);
+        Color darkBackground = Color.Black;
+
         for (int i = 0; i < this.TabCount; i++)
         {
-            DrawTab(e.Graphics, this.TabPages[i], i);
+            var tabPage = this.TabPages[i];
+            Rectangle tabRect = this.GetTabRect(i);
+
+            bool selected = (this.SelectedIndex == i);
+
+            using (var backBrush = new SolidBrush(selected ? blurple : darkBackground))
+            {
+                e.Graphics.FillRectangle(backBrush, tabRect);
+            }
+
+            using (var borderPen = new Pen(blurple, 1))
+            {
+                e.Graphics.DrawRectangle(borderPen, tabRect);
+            }
+
+            using (var textBrush = new SolidBrush(selected ? Color.White : blurple))
+            {
+                var sf = new StringFormat
+                {
+                    Alignment = StringAlignment.Center,
+                    LineAlignment = StringAlignment.Center
+                };
+                e.Graphics.DrawString(tabPage.Text, this.Font, textBrush, tabRect, sf);
+            }
         }
     }
 
-    private void DrawTab(Graphics g, TabPage tabPage, int index)
+    protected override void OnDrawItem(DrawItemEventArgs e)
     {
-        Rectangle tabRect = this.GetTabRect(index);
-        bool selected = (this.SelectedIndex == index);
-        
-        
-        using (var brush = new SolidBrush(selected ? Color.Maroon : Color.Black))
+        if (e.Index < 0 || e.Index >= this.TabPages.Count)
         {
-            g.FillRectangle(brush, tabRect);
+            base.OnDrawItem(e);
+            return;
         }
-        
-        // Draw tab border
-        using (var pen = new Pen(Color.Maroon, 1))
+
+        var tabPage = this.TabPages[e.Index];
+        Rectangle tabRect = this.GetTabRect(e.Index);
+
+        bool selected = (e.State & DrawItemState.Selected) == DrawItemState.Selected
+                        || this.SelectedIndex == e.Index;
+
+        Color blurple = Color.FromArgb(88, 101, 242);
+        Color darkBackground = Color.Black;
+
+        using (var backBrush = new SolidBrush(selected ? blurple : darkBackground))
         {
-            g.DrawRectangle(pen, tabRect);
+            e.Graphics.FillRectangle(backBrush, tabRect);
         }
-        
-        // Draw tab text
-        using (var brush = new SolidBrush(selected ? Color.White : Color.Maroon))
+
+        using (var borderPen = new Pen(blurple, 1))
+        {
+            e.Graphics.DrawRectangle(borderPen, tabRect);
+        }
+
+        using (var textBrush = new SolidBrush(selected ? Color.White : blurple))
         {
             var sf = new StringFormat
             {
                 Alignment = StringAlignment.Center,
                 LineAlignment = StringAlignment.Center
             };
-            g.DrawString(tabPage.Text, this.Font, brush, tabRect, sf);
+            e.Graphics.DrawString(tabPage.Text, this.Font, textBrush, tabRect, sf);
         }
-    }
-
-    protected override void OnSelectedIndexChanged(EventArgs e)
-    {
-        base.OnSelectedIndexChanged(e);
-        this.Invalidate();
     }
 }

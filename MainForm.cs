@@ -10,14 +10,15 @@ namespace HardwareSerialChecker;
 
 public partial class MainForm : Form
 {
-    private AnimatedBackgroundPanel backgroundPanel;
-    private TabControl tabControl;
+    private AnimatedBackgroundPanel backgroundPanel = null!;
+    private TabControl tabControl = null!;
+    private Panel gridHostPanel = null!;
     private Dictionary<string, DataGridView> dataGridViews;
-    private Button btnRefresh;
-    private Button btnCopy;
-    private Button btnExportJson;
-    private Button btnExportCsv;
-    private Label lblStatus;
+    private Button btnRefresh = null!;
+    private Button btnCopy = null!;
+    private Button btnExportJson = null!;
+    private Button btnExportCsv = null!;
+    private Label lblStatus = null!;
     private HardwareInfoService hardwareService;
     private Dictionary<string, List<HardwareItem>> categoryData;
 
@@ -34,6 +35,14 @@ public partial class MainForm : Form
     {
         try
         {
+            var exePath = Application.ExecutablePath;
+            if (!string.IsNullOrEmpty(exePath))
+            {
+                var exeIcon = Icon.ExtractAssociatedIcon(exePath);
+                if (exeIcon != null)
+                    return exeIcon;
+            }
+
             var baseDir = AppContext.BaseDirectory;
             var icoPath = Path.Combine(baseDir, "Assets", "appicon.ico");
             if (File.Exists(icoPath))
@@ -138,7 +147,7 @@ public partial class MainForm : Form
 
     private void InitializeComponent()
     {
-        this.Text = "Machinist's Serial Checker";
+        this.Text = "Hope's Serial Checker";
         this.Size = new Size(1200, 700);
         this.StartPosition = FormStartPosition.CenterScreen;
         this.BackColor = Color.Black;
@@ -158,15 +167,30 @@ public partial class MainForm : Form
         };
         this.Controls.Add(backgroundPanel);
 
-        // TabControl - Transparent
+        // TabControl - header strip only (content is rendered separately
+        // in gridHostPanel below).
         tabControl = new TransparentTabControl
         {
             Location = new Point(10, 10),
-            Size = new Size(1160, 550),
-            BackColor = Color.Transparent,
-            ForeColor = Color.Maroon
+            Size = new Size(1160, 40),
+            BackColor = Color.Black,
+            ForeColor = Color.FromArgb(88, 101, 242),
+            SizeMode = TabSizeMode.Fixed,
+            ItemSize = new Size(120, 30)
         };
         backgroundPanel.Controls.Add(tabControl);
+
+        // Panel that hosts the per-category DataGridViews, visually
+        // separated from the tab strip.
+        gridHostPanel = new Panel
+        {
+            Location = new Point(10, 70),
+            Size = new Size(1160, 460),
+            BackColor = Color.Black
+        };
+        backgroundPanel.Controls.Add(gridHostPanel);
+
+        tabControl.SelectedIndexChanged += TabControl_SelectedIndexChanged;
 
         // Create tabs for each category
         CreateTab("BIOS/System", "BIOS");
@@ -174,6 +198,7 @@ public partial class MainForm : Form
         CreateTab("Disks", "Disk");
         CreateTab("GPU", "GPU");
         CreateTab("Network", "NIC");
+        CreateTab("Monitors", "Monitor");
         CreateTab("USB", "USB");
         CreateTab("ARP", "ARP");
 
@@ -183,11 +208,11 @@ public partial class MainForm : Form
             Text = "Refresh All",
             Location = new Point(10, 570),
             Size = new Size(100, 30),
-            BackColor = Color.Maroon,
+            BackColor = Color.FromArgb(88, 101, 242),
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat
         };
-        btnRefresh.FlatAppearance.BorderColor = Color.Maroon;
+        btnRefresh.FlatAppearance.BorderColor = Color.FromArgb(88, 101, 242);
         btnRefresh.Click += BtnRefresh_Click;
         backgroundPanel.Controls.Add(btnRefresh);
 
@@ -196,11 +221,11 @@ public partial class MainForm : Form
             Text = "Copy Selected",
             Location = new Point(120, 570),
             Size = new Size(120, 30),
-            BackColor = Color.Maroon,
+            BackColor = Color.FromArgb(88, 101, 242),
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat
         };
-        btnCopy.FlatAppearance.BorderColor = Color.Maroon;
+        btnCopy.FlatAppearance.BorderColor = Color.FromArgb(88, 101, 242);
         btnCopy.Click += BtnCopy_Click;
         backgroundPanel.Controls.Add(btnCopy);
 
@@ -209,11 +234,11 @@ public partial class MainForm : Form
             Text = "Export JSON",
             Location = new Point(250, 570),
             Size = new Size(120, 30),
-            BackColor = Color.Maroon,
+            BackColor = Color.FromArgb(88, 101, 242),
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat
         };
-        btnExportJson.FlatAppearance.BorderColor = Color.Maroon;
+        btnExportJson.FlatAppearance.BorderColor = Color.FromArgb(88, 101, 242);
         btnExportJson.Click += BtnExportJson_Click;
         backgroundPanel.Controls.Add(btnExportJson);
 
@@ -222,11 +247,11 @@ public partial class MainForm : Form
             Text = "Export CSV",
             Location = new Point(380, 570),
             Size = new Size(120, 30),
-            BackColor = Color.Maroon,
+            BackColor = Color.FromArgb(88, 101, 242),
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat
         };
-        btnExportCsv.FlatAppearance.BorderColor = Color.Maroon;
+        btnExportCsv.FlatAppearance.BorderColor = Color.FromArgb(88, 101, 242);
         btnExportCsv.Click += BtnExportCsv_Click;
         backgroundPanel.Controls.Add(btnExportCsv);
 
@@ -238,7 +263,7 @@ public partial class MainForm : Form
             Text = "Click 'Refresh All' to load hardware information.",
             AutoSize = false,
             BackColor = Color.Transparent,
-            ForeColor = Color.Maroon
+            ForeColor = Color.FromArgb(88, 101, 242)
         };
         backgroundPanel.Controls.Add(lblStatus);
 
@@ -261,13 +286,16 @@ public partial class MainForm : Form
 
     private void CreateTab(string tabName, string category)
     {
-        var tabPage = new TransparentTabPage(tabName);
+        var tabPage = new TransparentTabPage(tabName)
+        {
+            Tag = category
+        };
         
         var dgv = new TransparentDataGridView
         {
             Dock = DockStyle.None,
             Location = new Point(10, 10),
-            Size = new Size(tabControl.Width - 40, 280),
+            Size = new Size(gridHostPanel.Width - 40, 280),
             Anchor = AnchorStyles.None,
             AutoGenerateColumns = true,
             ReadOnly = true,
@@ -278,7 +306,7 @@ public partial class MainForm : Form
             MultiSelect = true,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
             BackgroundColor = Color.Black,
-            GridColor = Color.Maroon,
+            GridColor = Color.FromArgb(88, 101, 242),
             ForeColor = Color.White,
             BorderStyle = BorderStyle.None,
             CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
@@ -290,35 +318,37 @@ public partial class MainForm : Form
         };
         
         // Style column headers - very dark, non-selectable
-        dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.Maroon;
+        dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(88, 101, 242);
         dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
-        dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.Maroon;
+        dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(88, 101, 242);
         dgv.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.White;
         dgv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
         
         dgv.DefaultCellStyle.BackColor = Color.Black;
         dgv.DefaultCellStyle.ForeColor = Color.White;
-        dgv.DefaultCellStyle.SelectionBackColor = Color.Maroon;
+        dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(88, 101, 242);
         dgv.DefaultCellStyle.SelectionForeColor = Color.White;
         
-        dgv.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(24, 0, 0);
-        dgv.AlternatingRowsDefaultCellStyle.SelectionBackColor = Color.Maroon;
+        dgv.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(15, 15, 35);
+        dgv.AlternatingRowsDefaultCellStyle.SelectionBackColor = Color.FromArgb(88, 101, 242);
         dgv.AlternatingRowsDefaultCellStyle.SelectionForeColor = Color.White;
         
-        tabPage.Controls.Add(dgv);
-        // Center grid within tab and keep positioned on resize
-        tabPage.Resize += (s, e) => CenterGridInTab(tabPage, dgv);
+        gridHostPanel.Controls.Add(dgv);
+        // Center grid within the shared host panel and keep positioned on resize
+        gridHostPanel.Resize += (s, e) => CenterGridInContainer(gridHostPanel, dgv);
         // Adjust height to content any time data changes
         dgv.DataBindingComplete += (s, e) => AdjustGridToContent(dgv);
         dgv.RowsAdded += (s, e) => AdjustGridToContent(dgv);
         dgv.RowsRemoved += (s, e) => AdjustGridToContent(dgv);
         tabControl.TabPages.Add(tabPage);
         dataGridViews[category] = dgv;
-        // Initial centering
-        CenterGridInTab(tabPage, dgv);
+        // Initial centering and visibility (only the first tab's grid is shown)
+        CenterGridInContainer(gridHostPanel, dgv);
+        dgv.Visible = (tabControl.TabPages.Count == 1);
     }
 
-    // Resize a grid's height to its content, leaving background visible
+    // Resize a grid's height to its content, leaving background visible, and
+    // then recenter it inside its parent container.
     private void AdjustGridToContent(DataGridView dgv, int minRows = 1, int maxHeight = 450)
     {
         try
@@ -336,23 +366,41 @@ public partial class MainForm : Form
             height = Math.Min(maxHeight, height);
             height = Math.Max(header + (minRows * rowHeight) + 2, height);
             dgv.Height = height;
-            // Recenter after height change
-            if (dgv.Parent is TabPage tp)
-                CenterGridInTab(tp, dgv);
+
+            if (dgv.Parent is Control container)
+            {
+                CenterGridInContainer(container, dgv);
+            }
         }
         catch { }
     }
 
-    private void CenterGridInTab(TabPage page, DataGridView dgv)
+    private void CenterGridInContainer(Control container, DataGridView dgv)
     {
-        if (page == null || dgv == null) return;
+        if (container == null || dgv == null) return;
         int margin = 20;
         int minWidth = 400;
-        int maxWidth = Math.Min(page.ClientSize.Width - margin * 2, 1100);
+        int maxWidth = Math.Min(container.ClientSize.Width - margin * 2, 1100);
         dgv.Width = Math.Max(minWidth, maxWidth);
-        int x = Math.Max(margin, (page.ClientSize.Width - dgv.Width) / 2);
-        int y = Math.Max(margin, (page.ClientSize.Height - dgv.Height) / 2);
+        int x = Math.Max(margin, (container.ClientSize.Width - dgv.Width) / 2);
+        int y = Math.Max(margin, (container.ClientSize.Height - dgv.Height) / 2);
         dgv.Location = new Point(x, y);
+    }
+
+    private void TabControl_SelectedIndexChanged(object? sender, EventArgs e)
+    {
+        var tab = tabControl.SelectedTab;
+        if (tab?.Tag is not string category)
+            return;
+
+        foreach (var grid in dataGridViews.Values)
+            grid.Visible = false;
+
+        if (dataGridViews.TryGetValue(category, out var dgv))
+        {
+            dgv.Visible = true;
+            CenterGridInContainer(gridHostPanel, dgv);
+        }
     }
 
     private void BtnRefresh_Click(object? sender, EventArgs e)
@@ -405,6 +453,13 @@ public partial class MainForm : Form
             dataGridViews["NIC"].DataSource = nicData;
             AdjustGridToContent(dataGridViews["NIC"]);
 
+            // Load Monitor info
+            var monitorData = hardwareService.GetMonitorInfo();
+            categoryData["Monitor"] = monitorData;
+            dataGridViews["Monitor"].DataSource = null;
+            dataGridViews["Monitor"].DataSource = monitorData;
+            AdjustGridToContent(dataGridViews["Monitor"]);
+
             // Load USB devices
             var usbData = hardwareService.GetUsbDevices();
             categoryData["USB"] = usbData;
@@ -434,14 +489,11 @@ public partial class MainForm : Form
     private void BtnCopy_Click(object? sender, EventArgs e)
     {
         var currentTab = tabControl.SelectedTab;
-        if (currentTab == null)
+        if (currentTab?.Tag is not string category)
             return;
-        
-        var category = dataGridViews.FirstOrDefault(kvp => kvp.Value.Parent == currentTab).Key;
-        if (category == null)
+
+        if (!dataGridViews.TryGetValue(category, out var dgv))
             return;
-        
-        var dgv = dataGridViews[category];
         
         if (dgv.SelectedRows.Count == 0)
         {
